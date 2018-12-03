@@ -1,62 +1,34 @@
 <template>
 <div>
-  <div class="input-group mb-3 p-2">
-    <input type="text" class="form-control" id="accountName" placeholder="EOS Account Name" v-model="accountName">
-    <div class="input-group-append">
-      <button class="btn btn-outline-secondary" type="button" id="button-addon2" @click="getAccountInfo()">조회</button>
-    </div>
-  </div>
-  <div class="row" id="info" v-if="info">
+  <search v-model="accountName" placeholder="New todo"  @keydown.enter="getAccountInfo"  @getinfo="getAccountInfo"/>
+  <div class="row" id="info" v-if="showInfo">
     <h2 class="col-12 text-center" id="account">
       EOS ACCOUNT
     </h2>
     <div class="col-12 row">
       <div class="col-6">
-        <div class="row p-2">
-          <div class="col-3">TOTAL(EOS)</div>
-          <div class="col-9" id="total">{{total}}</div>
-        </div>
-        <div class="row p-2">
-          <div class="col-3">UnStake(EOS)</div>
-          <div class="col-9" id="unStake">{{unStake}}</div>
-        </div>
-        <div class="row p-2">
-          <div class="col-3">Stake(EOS)</div>
-          <div class="col-9" id="stake">{{stake}}</div>
-        </div>
-        <div class="row p-2">
-          <div class="col-3">Refund(EOS)</div>
-          <div class="col-9" id="refund">{{refund}}</div>
-        </div>
-        <div class="row p-2">
-          <div class="col-3">CPU(up)</div>
-          <div class="col-9" id="cpu">{{cpu}}</div>
-        </div>
-        <div class="row p-2">
-          <div class="col-3">NET(byte)</div>
-          <div class="col-9" id="net">{{net}}</div>
-        </div>
-        <div class="row p-2">
-          <div class="col-3">RAM(byte)</div>
-          <div class="col-9" id="ram">{{ram}}</div>
-        </div>
+        <user-info
+          v-for="(value, title) in info"
+          :title = title
+          :value = value
+        />
       </div>
       <div class="col-6">
         <form>
           <div class="form-group">
-            <label for="exampleInputEmail1">상대계정</label>
+            <label>상대계정</label>
             <input type="text" class="form-control" id="to" aria-describedby="emailHelp" placeholder="받는계정" v-model="to">
           </div>
           <div class="form-group">
-            <label for="exampleInputPassword1">수량</label>
+            <label>수량</label>
             <input type="number" class="form-control" id="quantity" placeholder="수량" v-model="quantity">
           </div>
           <div class="form-group">
-            <label for="exampleInputPassword1">메모</label>
+            <label>메모</label>
             <textarea class="form-control" id="memo" placeholder="memo" v-model="memo"></textarea>
           </div>
           <div class="form-group">
-            <label for="exampleInputPassword1">privateKey</label>
+            <label>privateKey</label>
             <input type="text" class="form-control" id="privateKey" placeholder="privateKey" v-model="privateKey">
           </div>
           <button type="button" @click="transfer()" class="btn btn-primary">Submit</button>
@@ -64,16 +36,7 @@
       </div>
     </div>
   </div>
-
-  <div class="text-danger" id="error" v-if="error">
-    <h3>ERROR :( </h3>
-    <div id="errorText"> {{errorText}} </div>
-  </div>
-  <div class="text-success" id="success" v-if="success">
-    <h3>SUCCESS :) </h3>
-    <a v-bind:href="successUrl">{{successText}}</a>
-  </div>
-
+  <message :result="result"/>
 </div>
 </template>
 
@@ -84,53 +47,56 @@ const config = {
   httpEndpoint: 'https://api-kylin.eosasia.one',
   chainId: '5fff1dae8dc8e2fc4d5b23b2c7665c97f9e9d8edf2b6485a86ba311c25639191'
 }
+import message from "./message.vue";
+import search from "./search.vue";
+import userInfo from "./userInfo.vue";
 
 export default {
-  name: 'main',
+  components: {
+    message,
+    search,
+    userInfo
+  },
   data: function () {
     return {
       accountName: '',
-      info: false,
-      error: false,
-      errorText: '',
-      success: false,
-      successUrl: '',
-      successText: '',
-      account: '',
-      stake: '',
-      unStake: '',
-      refund: '',
-      total: '',
-      cpu: '',
-      net: '',
-      ram: '',
+      showInfo: false,
+      result: {},
+      info: {
+        total : 0,
+        unStake : 0,
+        stake : 0,
+        refund : 0,
+        cpu : 0,
+        net : 0,
+        ram : 0
+      },
       to: '',
       quantity: '',
       memo: '',
-      privateKey: ''
+      privateKey: '',
     }
   },
   methods: {
     getAccountInfo () {
       Eos(config).getAccount(this.accountName).then(account => {
+        this.result = {};
         const count = {
           stake: account.voter_info ? account.voter_info.staked / 10000 : 0,
           unStake: account.core_liquid_balance ? Number(account.core_liquid_balance.replace(' EOS', '')) : 0,
           refund: account.refund_request ? Number(account.refund_request.net_amount.replace(' EOS', '')) + Number(account.refund_request.cpu_amount.replace(' EOS', '')) : 0
         }
         count.total = count.stake + count.unStake + count.refund
-        this.info = true
-        this.stake = count.stake
-        this.unStake = count.unStake
-        this.refund = count.refund
-        this.total = count.total
-        this.cpu = `${account.cpu_limit.used} up / ${account.cpu_limit.max} up (${account.total_resources.cpu_weight})`
-        this.net = `${account.net_limit.used} bytes / ${account.net_limit.max} bytes (${account.total_resources.net_weight})`
-        this.ram = `${account.ram_usage} bytes / ${account.ram_quota} bytes`
+        this.showInfo = true
+        this.info.stake = count.stake
+        this.info.unStake = count.unStake
+        this.info.refund = count.refund
+        this.info.total = count.total
+        this.info.cpu = `${account.cpu_limit.used} up / ${account.cpu_limit.max} up (${account.total_resources.cpu_weight})`
+        this.info.net = `${account.net_limit.used} bytes / ${account.net_limit.max} bytes (${account.total_resources.net_weight})`
+        this.info.ram = `${account.ram_usage} bytes / ${account.ram_quota} bytes`
       }).catch(err => {
-        this.info = false
-        this.error = true
-        this.errorText = err.message
+        this.result = { type : 'error', text: err.message}
       })
     },
     transfer () {
@@ -141,22 +107,18 @@ export default {
       const privateKey = this.privateKey
 
       if (to && quantity && privateKey) {
-        this.error = false
+        this.result = {}
         config.keyProvider = privateKey
         Eos(config).transaction('eosio.token', (coin) => {
           coin.transfer(from, to, `${Number(quantity).toFixed(4)} EOS`, memo)
         })
           .then(trans => {
-            this.success = true
-            this.successUrl = `https://tools.cryptokylin.io/#/tx/${trans.transaction_id}`
-            this.successText = trans.transaction_id
+            this.result = { type : 'success', text: trans.transaction_id, url: `https://tools.cryptokylin.io/#/tx/${trans.transaction_id}`}
           }).catch(err => {
-            this.error = true
-            this.errorText = err.message
+            this.result = { type : 'error', text: err.message}
           })
       } else {
-        this.error = true
-        this.errorText = '필수값을 입력해주세요'
+        this.result = { type : 'error', text: '필수값을 입력해주세요'}
       }
     }
   }
